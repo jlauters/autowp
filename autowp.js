@@ -10,10 +10,8 @@ var execSync = require('exec-sync');
 
 // load our config from file
 nconf.use('file', {file: 'config.json'});
-nconf.load();
-
-nconf.set('chmod_string', 'jonlatuers:admin');
-nconf.save();
+//nconf.load();
+//nconf.save();
 
 // create empty mysql database
 var db_conn = mysql.createConnection({
@@ -34,15 +32,21 @@ db_conn.end();
 
 console.log('.. database %s created', nconf.get('db_name'));
 
-
-// download wordpress
-// passing the wp.com url for latest download
-// our local webroot
-// a callback function of items after download.
-var unzip_result = zipDownload(nconf.get('zipfile_url'), nconf.get('webroot'), function() { console.log("this is just a test callback."); });
-
 // perform some actions on WP after download and unzip.
 var download_callback = function() {
+
+   // append to vhosts and /etc/hosts
+   var vhosts  = "<VirtualHost *:80>\n";
+       vhosts += "    ServerName " + nconf.get('app_name') + ".local\n";
+       vhosts += "    DocumentRoot " + nconf.get('webroot') + nconf.get('app_name') + "/\n";
+       vhosts += "</VirtualHost>\n";
+
+   fs.appendFile(nconf.get('hosts_path'), '127.0.0.1 ' + nconf.get('app_name') + '.local', function(err) { if (err) {throw err;} });
+   fs.appendFile(nconf.get('vhosts_path'), vhosts, function(err) {if (err) {throw err;} });
+
+   console.log('.. entry in %s for %s created', nconf.get('hosts_path'), nconf.get('app_name'));
+   console.log('.. entry in %s for %s created', nconf.get('vhosts_path'), nconf.get('app_name'));
+
    // rename our wordpress directory to the new application name we want
    fs.rename(nconf.get('webroot') + 'wordpress', nconf.get('webroot') + nconf.get('app_name'), function() {
        console.log('.. wordpress directory created'); 
@@ -72,7 +76,22 @@ var download_callback = function() {
 
    // change ownership after we edit them
    execSync("chown " + nconf.get('chmod_string') + " " + config_file);
+
+   // bounce apache (MAMP) to let changes take effect
+   execSync("cd /Applications/MAMP/bin/; sudo ./stopApache.sh");
+
+   console.log('.. stopping Apache');
+   setTimeout(function() {
+       execSync("cd /Applications/MAMP/bin/; sudo ./startApache.sh");
+       console.log('.. starting Apache');
+   }, 5000);
 }
+
+// download wordpress
+// passing the wp.com url for latest download
+// our local webroot
+// a callback function of items after download.
+var unzip_result = zipDownload(nconf.get('zipfile_url'), nconf.get('webroot'), download_callback);
 
 // zip file download, mv, inflate
 function zipDownload(zipurl, zip_location, callback) {
@@ -83,10 +102,7 @@ function zipDownload(zipurl, zip_location, callback) {
         port: 80
     };
 
-    // GET file
     http.get(options, function(response) {
-
-        console.log('.. getting zip');
 
         var data = [];
         var dataLen = 0;
@@ -95,10 +111,9 @@ function zipDownload(zipurl, zip_location, callback) {
             data.push(chunk);
             dataLen += chunk.length;
         }).on('end', function() {
-            console.log('done downloading');
+            console.log('zip download has been completed.');
 
             var buf = new Buffer(dataLen);
-
             for(var i=0, len = data.length, pos = 0; i < len; i++) {
                 data[i].copy(buf, pos);
                 pos += data[i].length;
@@ -107,36 +122,16 @@ function zipDownload(zipurl, zip_location, callback) {
             var zip = new AdmZip(buf);
             var zipEntries = zip.getEntries();
 
-            zip.extractAllTo(zipurl, true);
+            zip.extractAllTo(zip_location, true);
 
-            console.log('done with zip extract');
+            console.log('zip extraction to' + zip_location + ' complete ..');
 
             // optional callback after zip extract
             callback();
-
-            // append to vhosts and /etc/hosts
-            var vhosts  = "<VirtualHost *:80>\n";
-                vhosts += "    ServerName " + nconf.get('app_name') + ".local\n";
-                vhosts += "    DocumentRoot " + nconf.get('webroot') + nconf.get('app_name') + "/\n";
-                vhosts += "</VirtualHost>\n";
-
-            fs.appendFile(nconf.get('hosts_path'), '127.0.0.1 ' + nconf.get('app_name') + '.local', function(err) { if (err) throw err; });
-            fs.appendFile(nconf.get('vhosts_path'), vhosts, function(err) {if (err) throw err; });
-
-            console.log('.. entry in %s for %s created', nconf.get('hosts_path'), nconf.get('app_name'));
-            console.log('.. entry in %s for %s created', nconf.get('vhosts_path'), nconf.get('app_name')); 
-
-            // bounce apache (MAMP) to let changes take effect
-            execSync("cd /Applications/MAMP/bin/; sudo ./stopApache.sh");
-            console.log('.. stopping Apache');
-            setTimeout(function() {
-                execSync("cd /Applications/MAMP/bin/; sudo ./startApache.sh");
-                console.log('.. starting Apache');
-            }, 5000);
         });
     });
 }
 
 console.log('done with zipdownload function');
-
+console.log('autowp script complete ...');
 
