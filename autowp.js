@@ -1,50 +1,90 @@
-#!/usr/min/env node
-
 // module dependencies
-var http    = require('http');
-var request = require('request');
-var url     = require('url');
-var AdmZip  = require('adm-zip');
-var fs      = require('fs');
-var program = require('commander');
-var mysql   = require('mysql');
+var http     = require('http');
+var request  = require('request');
+var url      = require('url');
+var AdmZip   = require('adm-zip');
+var fs       = require('fs');
+var nconf    = require('nconf');
+var mysql    = require('mysql');
+var execSync = require('exec-sync');
 
-// path variables
-var zipfile_url = 'http://wordpress.org/latest.zip';
-var webroot     = '/Applications/MAMP/htdocs/';
+// load our config from file
+nconf.use('file', {file: 'config.json'});
+nconf.load();
 
-program
-  .version('0.0.1')
-  .option('-n, --name <app_name>', 'application name *required')
-  .option('-d, --db_name <db_name>', 'database name *required')
-  .option('-t, --theme_url <theme_url>', 'theme url (defaults to twentytwelve)')
+nconf.set('chmod_string', 'jonlatuers:admin');
+nconf.save();
 
-console.log('starting autowp with options: ');
-program.parse(process.argv);
+// wp db user settings
+//nconf.set('wp_db_user', 'jon');
+//nconf.set('wp_db_pass', 'wppassword');
+//nconf.save();
 
-// get our application name or die to help()
-if(program.name) {
-    console.log('  - name: %s', program.name);
-} else {
-    program.help();
+// new config settings
+/*nconf.set('app_name', 'jonny_wp');
+nconf.set('db_name', 'jonny_wp');
+nconf.set('zipfile_url', 'http://wordpress.org/latest.zip');
+nconf.set('webroot', '/Applications/MAMP/htdocs/');
+nconf.set('hosts_path', '/etc/hosts');
+nconf.set('vhosts_path', '/Applications/MAMP/conf/apache/extra/httpd-vhosts.conf');
+nconf.save();*/
 
-}
+/*var unzip_result = zipDownload(nconf.get('zipfile_url'), nconf.get('webroot'), function() { console.log("this is just a test callback."); });
 
-// get our database name or die to help()
-if(program.db_name) {
-    console.log('  - db_name: %s', program.db_name);
-} else {
-    program.help();
-}
+// zip file download, mv, inflate
+function zipDownload(zipurl, zip_location, callback) {
 
-// if we have a theme url great, otherwise we'll just use a default wp theme
-if(program.theme_url) console.log('  - theme_url: %s', program.theme_url);
+    console.log('in zipDownload ...');
+    console.log('url: ' + zipurl);
+    console.log('loc: ' + zip_location);
+
+    var options = {
+        host: url.parse(zipurl).host,
+        path: url.parse(zipurl).pathname,
+        port: 80
+    };
+
+    // GET file
+    http.get(options, function(response) {
+
+        console.log('.. getting zip');
+
+        var data = [];
+        var dataLen = 0;
+
+        response.on('data', function(chunk) {
+            data.push(chunk);
+            dataLen += chunk.length;
+        }).on('end', function() {
+            console.log('and were done downloading');
+
+            var buf = new Buffer(dataLen);
+
+            for(var i=0, len = data.length, pos = 0; i < len; i++) {
+                data[i].copy(buf, pos);
+                pos += data[i].length;
+            }
+
+            var zip = new AdmZip(buf);
+            var zipEntries = zip.getEntries();
+
+            zip.extractAllTo(zip_url, true);
+
+            console.log('done with zip extract');
+
+            // optional callback after zip extract
+            callback();
+
+        });
+    });
+}*/
+
 
 // set up our options
 var options = {
-    host: url.parse(zipfile_url).host,
+    host: url.parse(nconf.get('zipfile_url')).host,
     port: 80,
-    path: url.parse(zipfile_url).pathname
+    path: url.parse(nconf.get('zipfile_url')).pathname
 };
 
 // download the file
@@ -65,31 +105,81 @@ http.get(options, function(res) {
         var zip = new AdmZip(buf);
         var zipEntries = zip.getEntries();
 
-        zip.extractAllTo(webroot, true);
+        zip.extractAllTo(nconf.get('webroot'), true);
+
+        /***************************************
+         * Put in callback for WP zip download *
+         ***************************************/
 
         // rename our wordpress directory to the new application name we want
-        fs.rename(webroot + 'wordpress', webroot + program.name, function() {
+        fs.rename(nconf.get('webroot') + 'wordpress', nconf.get('webroot') + nconf.get('app_name'), function() {
             console.log('.. wordpress directory created'); 
         });
 
+        // change ownership back to normal
+        execSync("chown -R " + nconf.get('chmod_string') + " " + nconf.get('webroot') + nconf.get('app_name'));
+
+        // edit wp-config.php to set DB Settings
+        var config_file = nconf.get('webroot') + nconf.get('app_name') + "/wp-config.php";
+        execSync("cp " + nconf.get('webroot') + nconf.get('app_name') + "/wp-config-sample.php " + config_file);
+        console.log('.. created ' + config_file);
+
+        fs.readFile(config_file, 'utf8', function(err, data) {
+            if(err) {
+                return console.log(err);
+            }
+
+            var result = data.replace(/database_name_here/g, nconf.get('db_name'));
+                result = result.replace(/username_here/g, nconf.get('wp_db_user'));
+                result = result.replace(/password_here/g, nconf.get('wp_db_pass'));
+
+            fs.writeFile(config_file, result, 'utf8', function(err) {
+                if(err) return console.log(err);
+            });
+        });
+
+        // change ownership after we edit them
+        execSync("chown " + nconf.get('chmod_string') + " " + config_file);
     });
 });
 
-// create` the mysql database
+// create empty mysql database
 var db_conn = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'root',
-    port: 8889
+    host: nconf.get('database:host'),
+    user: nconf.get('database:user'),
+    password: nconf.get('database:password'),
+    port: nconf.get('database:port')
 });
 
 db_conn.connect(function(err) {
     if(err) throw err;
 });
 
-db_conn.query('CREATE DATABASE ' + program.db_name, function(err, results) {
+db_conn.query('CREATE DATABASE ' + nconf.get('db_name'), function(err, results) {
     if (err) throw err;
 });
 db_conn.end();
 
-console.log('.. database %s created', program.db_name);
+console.log('.. database %s created', nconf.get('db_name'));
+
+// append to vhosts and /etc/hosts
+var vhosts  = "<VirtualHost *:80>\n";
+    vhosts += "    ServerName " + nconf.get('app_name') + ".local\n";
+    vhosts += "    DocumentRoot " + nconf.get('webroot') + nconf.get('app_name') + "/\n";
+    vhosts += "</VirtualHost>\n";
+
+fs.appendFile(nconf.get('hosts_path'), '127.0.0.1 ' + nconf.get('app_name') + '.local', function(err) { if (err) throw err; });
+fs.appendFile(nconf.get('vhosts_path'), vhosts, function(err) {if (err) throw err; });
+
+console.log('.. entry in %s for %s created', nconf.get('hosts_path'), nconf.get('app_name'));
+console.log('.. entry in %s for %s created', nconf.get('vhosts_path'), nconf.get('app_name'));
+
+// bounce apache (MAMP) to let changes take effect
+execSync("cd /Applications/MAMP/bin/; sudo ./stopApache.sh");
+console.log('.. stopping Apache');
+setTimeout(function() {
+    execSync("cd /Applications/MAMP/bin/; sudo ./startApache.sh");
+    console.log('.. starting Apache');
+}, 5000);
+
+
