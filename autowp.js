@@ -32,33 +32,42 @@ db_conn.end();
 
 console.log('.. database %s created', nconf.get('db_name'));
 
-// perform some actions on WP after download and unzip.
+// this callback is for events you wish to occur
+// after the wordpress zip file has been downloaded
+// unzipped and moved into the webroot directory
 var download_callback = function() {
-
-   // append to vhosts and /etc/hosts
-   var vhosts  = "<VirtualHost *:80>\n";
-       vhosts += "    ServerName " + nconf.get('app_name') + ".local\n";
-       vhosts += "    DocumentRoot " + nconf.get('webroot') + nconf.get('app_name') + "/\n";
-       vhosts += "</VirtualHost>\n";
-
-   fs.appendFile(nconf.get('hosts_path'), '127.0.0.1 ' + nconf.get('app_name') + '.local', function(err) { if (err) {throw err;} });
-   fs.appendFile(nconf.get('vhosts_path'), vhosts, function(err) {if (err) {throw err;} });
-
-   console.log('.. entry in %s for %s created', nconf.get('hosts_path'), nconf.get('app_name'));
-   console.log('.. entry in %s for %s created', nconf.get('vhosts_path'), nconf.get('app_name'));
 
    // rename our wordpress directory to the new application name we want
    fs.rename(nconf.get('webroot') + 'wordpress', nconf.get('webroot') + nconf.get('app_name'), function() {
-       console.log('.. wordpress directory created'); 
+       console.log('renamed wordpress directory to ' + nconf.get('app_name')); 
    });
 
    // change ownership back to normal
    execSync("chown -R " + nconf.get('chmod_string') + " " + nconf.get('webroot') + nconf.get('app_name'));
 
+   // append new line to hosts file
+   fs.appendFile(nconf.get('hosts_path'), '127.0.0.1 ' + nconf.get('app_name') + '.local', function(err) { if (err) {throw err;} });
+   console.log('.. entry in %s for %s created', nconf.get('hosts_path'), nconf.get('app_name'));
+
+   // append to vhosts file
+   var vhosts  = "<VirtualHost *:80>\n";
+       vhosts += "    ServerName " + nconf.get('app_name') + ".local\n";
+       vhosts += "    DocumentRoot " + nconf.get('webroot') + nconf.get('app_name') + "/\n";
+       vhosts += "</VirtualHost>\n";
+
+   fs.appendFile(nconf.get('vhosts_path'), vhosts, function(err) {if (err) {throw err;} });
+   console.log('.. entry in %s for %s created', nconf.get('vhosts_path'), nconf.get('app_name'));
+
+   // append to functions.php
+   fs.readFile('functions_additions.php', function(err, data) {
+       if(err) { return console.log(err); }
+
+       fs.appendFile(nconf.get('webroot') + nconf.get('app_name') + nconf.get('functions_path'), data, function(err) { if (err) {throw err;} });
+   });   
+
    // edit wp-config.php to set DB Settings
    var config_file = nconf.get('webroot') + nconf.get('app_name') + "/wp-config.php";
    execSync("cp " + nconf.get('webroot') + nconf.get('app_name') + "/wp-config-sample.php " + config_file);
-   console.log('.. created ' + config_file);
 
    fs.readFile(config_file, 'utf8', function(err, data) {
        if(err) {
@@ -73,17 +82,16 @@ var download_callback = function() {
            if(err) return console.log(err);
        });
    });
-
-   // change ownership after we edit them
    execSync("chown " + nconf.get('chmod_string') + " " + config_file);
+   console.log('wp-config updated with DB settings ...');
 
    // bounce apache (MAMP) to let changes take effect
+   console.log('bouncing webserver ...');
    execSync("cd /Applications/MAMP/bin/; sudo ./stopApache.sh");
 
-   console.log('.. stopping Apache');
    setTimeout(function() {
        execSync("cd /Applications/MAMP/bin/; sudo ./startApache.sh");
-       console.log('.. starting Apache');
+       console.log('... webserver bounce complete.');
    }, 5000);
 }
 
