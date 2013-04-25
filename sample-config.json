@@ -1,0 +1,18 @@
+{
+  "webroot": "/path/to/local/webroot",
+  "app_name": "APP_NAME",
+  "db_name": "APP_DB_NAME",
+  "database": {
+    "host": "localhost",
+    "port": 8889,
+    "user": "root",
+    "password": "root"
+  },
+  "zipfile_url": "http://wordpress.org/latest.zip",
+  "hosts_path": "/path/to/hosts/file",
+  "vhosts_path": "/path/to/apache/vhosts",
+  "wp_db_user": "WP_DB_USER",
+  "wp_db_pass": "WP_DB_PASS",
+  "chmod_string": "file permissions stuff",
+  "functions_path": "/wp-content/themes/twentytwelve/functions.php"
+}
