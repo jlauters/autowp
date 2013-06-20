@@ -32,4 +32,7 @@ jQuery(document.ready(function($) {
         }
     }); 
 
+    // close
+    $('#font-switch > a').click(function() { $('#font-switch').hide(); });
+
 });
