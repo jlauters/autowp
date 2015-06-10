@@ -1,0 +1,18 @@
+{
+  "webroot": "/Applications/MAMP/htdocs/",
+  "app_name": "oxifreshfranchise_wp",
+  "db_name": "oxifreshfranchise_wp",
+  "database": {
+    "host": "localhost",
+    "port": 8889,
+    "user": "root",
+    "password": "root"
+  },
+  "zipfile_url": "https://wordpress.org/latest.tar.gz",
+  "hosts_path": "/etc/hosts",
+  "vhosts_path": "/Applications/MAMP/conf/apache/extra/httpd-vhosts.conf",
+  "wp_db_user": "jon",
+  "wp_db_pass": "wppassword",
+  "chmod_string": "jonlatuers:admin",
+  "functions_path": "/wp-content/themes/twentyfourteen/functions.php"
+}

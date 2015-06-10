@@ -1,0 +1,36 @@
+{
+  "name": "autowp",
+  "version": "1.0.0",
+  "description": "Generate New Wordpress Local Project based on config",
+  "main": "autowp.js",
+  "dependencies": {
+    "commander": "^2.8.1",
+    "grunt-curl": "^2.2.0",
+    "adm-zip": "^0.4.7",
+    "request": "^2.57.0",
+    "grunt": "^0.4.5",
+    "tar.gz": "^0.1.1",
+    "nconf": "^0.7.1",
+    "mysql": "^2.7.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "node autop.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jlauters/autowp.git"
+  },
+  "keywords": [
+    "WordPress",
+    "Automation",
+    "Local",
+    "Setup"
+  ],
+  "author": "Jon Lauters",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jlauters/autowp/issues"
+  },
+  "homepage": "https://github.com/jlauters/autowp#readme"
+}

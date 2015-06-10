@@ -1,0 +1,8 @@
+<VirtualHost *:80>
+    ServerName gary_thomas.local
+    DocumentRoot /Applications/MAMP/htdocs/gary_thomas/
+</VirtualHost>
+<VirtualHost *:80>
+    ServerName jonny_wp.local
+    DocumentRoot /Applications/MAMP/htdocs/jonny_wp/
+</VirtualHost>
